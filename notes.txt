@@ -1,0 +1,65 @@
+https://medium.com/stashaway-engineering/building-your-first-cadence-workflow-e61a0b29785
+
+/*
+Error:
+# go.uber.org/cadence/internal/common
+../../go/pkg/mod/go.uber.org/cadence@v0.9.1/internal/common/thrift_util.go:29:38: not enough arguments in call to thrift.NewTSerializer().Write
+	have (thrift.TStruct)
+	want (context.Context, thrift.TStruct)
+../../go/pkg/mod/go.uber.org/cadence@v0.9.1/internal/common/thrift_util.go:51:27: not enough arguments in call to t.Protocol.Flush
+	have ()
+	want (context.Context)
+../../go/pkg/mod/go.uber.org/cadence@v0.9.1/internal/common/thrift_util.go:55:28: not enough arguments in call to t.Transport.Flush
+	have ()
+	want (context.Context)
+*/
+Solution:
+https://github.com/uber-go/cadence-client/issues/523#issuecomment-528878431
+```
+go mod edit -replace "github.com/apache/thrift=github.com/apache/thrift@a9b748bb0e02"
+go mod tidy
+```
+
+if running go 1.16.3
+To register the sample-domain successfully, run the following cmd for temp fix
+https://github.com/uber/cadence/issues/4013#issuecomment-785089460
+docker run --network=host --rm ubercadence/cli:master --domain sample-domain domain register --active_cluster active --rd 10
+
+""" docker run --network=host --rm ubercadence/cli:master """
+tells docker to download the ubercadence/cli image from the master branch and run it in the host network.
+""" --rm """
+will remove the container once you have finished the command so you will not end up with too many stray containers.
+""" --do sample-domain """
+tells the command to work in the domain called sample-domain
+""" domain register """
+tells it to register the domain to cadence memory.
+""" --rd """
+how many days you want the retain the workflow data
+
+
+docker run --network=host --rm ubercadence/cli:master --domain sample-domain workflow start --tl <tasklistName> --wt <workflow_type> --et <execution_timeout> --dt <decision_timeout> -i '<input_value>'
+docker run --network=host --rm ubercadence/cli:master --domain sample-domain workflow terminate -w <workflowId> -r <runId> --re "<reason>"
+docker run --network=host --rm ubercadence/cli:master --domain sample-domain workflow signal -w <wid> -r <rid> -n <signal-name> -i '"signal-value"'
+
+
+The Worker: Where your business logic lives
+
+The workflow codes live in a program that we call the worker. The worker is a go binary when compiled that
+collects tasks to work on from the cadence service based on your predetermined task-list.
+
+The good thing about this design is that you can scale up your worker and service independently.
+Eg. When you start having a lot of long-running workflows, the workers will most likely be the first to take the hit
+at performance. In such an instance, you will be able to scale up your workers to handle the workload without needing to
+scale up the main cadence service.
+
+To not rely on the project being in the GOPATH, let us begin by creating a go.mod file. In the project root directory,
+run the command go mod init github.com/nndd91/cadence-api-example. Create a new directory call app and we can begin coding.
+
+
+
+docker run --network=host --rm ubercadence/cli:master --domain sample-domain workflow start --tl helloWorldGroup --wt github.com/ganyulong02/first-cadence-app/app/worker/workflows.Workflow --et 999 --dt 60 -i '"Yulong Gan"'
+docker run --network=host --rm ubercadence/cli:master --domain sample-domain workflow signal -w 2732a065-6849-4b89-a753-afd51501b98b -n helloWorldSignal -i '30'
+
+
+2021-04-11T18:11:16.578-0700    ERROR   internal/internal_worker_base.go:268    Worker received non-retriable error.
+Shutting down.     {"Domain": "sample-domain", "TaskList": "helloWorldGroup", "WorkerID": "50148@ygan-linux-NUC@helloWorldGroup", "WorkerType": "DecisionWorker", "error": "ClientVersionNotSupportedError{FeatureVersion: 1.6.0, ClientImpl: uber-go, SupportedVersions: <1.3}"}
